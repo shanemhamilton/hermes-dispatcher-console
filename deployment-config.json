@@ -1,0 +1,33 @@
+{
+  "appName": "hermes-dispatcher-console",
+  "region": "us-east-1",
+  "environments": {
+    "dev": {
+      "branch": "develop",
+      "apiGatewayUrl": "https://api-dev.hermes.com",
+      "websocketUrl": "wss://ws-dev.hermes.com",
+      "cognitoUserPoolId": "us-east-1_dev",
+      "cognitoClientId": "dev-client-id"
+    },
+    "staging": {
+      "branch": "staging",
+      "apiGatewayUrl": "https://api-staging.hermes.com",
+      "websocketUrl": "wss://ws-staging.hermes.com",
+      "cognitoUserPoolId": "us-east-1_staging",
+      "cognitoClientId": "staging-client-id"
+    },
+    "production": {
+      "branch": "main",
+      "apiGatewayUrl": "https://api.hermes.com",
+      "websocketUrl": "wss://ws.hermes.com",
+      "cognitoUserPoolId": "us-east-1_prod",
+      "cognitoClientId": "prod-client-id"
+    }
+  },
+  "buildSettings": {
+    "framework": "nextjs",
+    "baseDirectory": "hermes-dispatch/dispatcher-console",
+    "buildCommand": "npm run build",
+    "startCommand": "npm run start"
+  }
+}

@@ -1,0 +1,3 @@
+{
+  "buildSpec": "version: 1\napplications:\n  - appRoot: hermes-dispatch/dispatcher-console\n    frontend:\n      phases:\n        preBuild:\n          commands:\n            - cd hermes-dispatch/dispatcher-console\n            - npm ci\n        build:\n          commands:\n            - npm run build\n      artifacts:\n        baseDirectory: hermes-dispatch/dispatcher-console/.next\n        files:\n          - '**/*'\n      cache:\n        paths:\n          - hermes-dispatch/dispatcher-console/node_modules/**/*\n          - hermes-dispatch/dispatcher-console/.next/cache/**/*"
+}

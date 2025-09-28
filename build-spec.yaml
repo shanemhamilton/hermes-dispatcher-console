@@ -1,0 +1,20 @@
+version: 1
+applications:
+  - appRoot: hermes-dispatch/dispatcher-console
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - cd hermes-dispatch/dispatcher-console
+            - npm ci
+        build:
+          commands:
+            - npm run build
+      artifacts:
+        baseDirectory: hermes-dispatch/dispatcher-console/.next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - 'hermes-dispatch/dispatcher-console/node_modules/**/*'
+          - 'hermes-dispatch/dispatcher-console/.next/cache/**/*'

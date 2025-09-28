@@ -1,0 +1,12 @@
+{
+  "NEXT_PUBLIC_ENVIRONMENT": "production",
+  "AMPLIFY_DIFF_DEPLOY": "false",
+  "AMPLIFY_MONOREPO_APP_ROOT": "hermes-dispatch/dispatcher-console",
+  "_CUSTOM_IMAGE": "amplify:al2023",
+  "NEXT_PUBLIC_API_GATEWAY_URL": "https://api.hermes.com",
+  "NEXT_PUBLIC_WEBSOCKET_URL": "wss://ws.hermes.com",
+  "NEXT_PUBLIC_COGNITO_USER_POOL_ID": "us-east-1_example",
+  "NEXT_PUBLIC_COGNITO_CLIENT_ID": "example-client-id",
+  "NEXT_PUBLIC_COGNITO_REGION": "us-east-1",
+  "NEXT_PUBLIC_AWS_REGION": "us-east-1"
+}
