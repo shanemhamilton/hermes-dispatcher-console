@@ -11,16 +11,8 @@ const amplifyConfig = {
     Cognito: {
       userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '',
       userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
-      identityPoolId: process.env.NEXT_PUBLIC_COGNITO_IDENTITY_POOL_ID || '',
-      signUpVerificationMethod: 'code',
+      signUpVerificationMethod: 'code' as const,
       loginWith: {
-        oauth: {
-          domain: process.env.NEXT_PUBLIC_COGNITO_OAUTH_DOMAIN || '',
-          scopes: ['openid', 'email', 'profile'],
-          redirectSignIn: [process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')],
-          redirectSignOut: [process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')],
-          responseType: 'code'
-        },
         email: true,
         username: false
       }
@@ -28,7 +20,10 @@ const amplifyConfig = {
   }
 };
 
-Amplify.configure(amplifyConfig);
+// Only configure if we have the required values
+if (amplifyConfig.Auth.Cognito.userPoolId && amplifyConfig.Auth.Cognito.userPoolClientId) {
+  Amplify.configure(amplifyConfig);
+}
 
 interface AuthState {
   user: User | null;
