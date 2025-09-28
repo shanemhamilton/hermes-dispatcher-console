@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Amplify } from 'aws-amplify';
 import { getCurrentUser, signIn, signOut, fetchAuthSession } from '@aws-amplify/auth';
-import { User, UserRole, Permission, Tenant } from '@/types';
+import { User, UserRole, Permission, Tenant, ServiceType } from '@/types';
 
 // Amplify configuration - these should come from environment variables
 const amplifyConfig = {
@@ -11,8 +11,16 @@ const amplifyConfig = {
     Cognito: {
       userPoolId: process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || '',
       userPoolClientId: process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || '',
-      signUpVerificationMethod: 'code' as const,
+      identityPoolId: process.env.NEXT_PUBLIC_COGNITO_IDENTITY_POOL_ID || '',
+      signUpVerificationMethod: 'code',
       loginWith: {
+        oauth: {
+          domain: process.env.NEXT_PUBLIC_COGNITO_OAUTH_DOMAIN || '',
+          scopes: ['openid', 'email', 'profile'],
+          redirectSignIn: [process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_IN || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')],
+          redirectSignOut: [process.env.NEXT_PUBLIC_COGNITO_REDIRECT_SIGN_OUT || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')],
+          responseType: 'code'
+        },
         email: true,
         username: false
       }
@@ -20,10 +28,7 @@ const amplifyConfig = {
   }
 };
 
-// Only configure if we have the required values
-if (amplifyConfig.Auth.Cognito.userPoolId && amplifyConfig.Auth.Cognito.userPoolClientId) {
-  Amplify.configure(amplifyConfig);
-}
+Amplify.configure(amplifyConfig);
 
 interface AuthState {
   user: User | null;
@@ -80,27 +85,79 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (accessToken && idToken) {
           // Decode the ID token to get user info
           const userInfo = parseJWT(idToken);
-          const tenants = await fetchUserTenants(accessToken);
+          console.log('User info from JWT:', userInfo);
+
+          // Get user groups from Cognito
+          const userGroups = userInfo['cognito:groups'] || [];
+          console.log('User groups:', userGroups);
+          console.log('User email:', userInfo.email);
+
+          // Determine role based on groups - default to DISPATCHER if in Dispatchers group
+          let userRole = UserRole.DISPATCHER;
+          if (userGroups.includes('Admins')) {
+            userRole = UserRole.ADMIN;
+          } else if (userGroups.includes('Managers')) {
+            userRole = UserRole.MANAGER;
+          } else if (userGroups.includes('Support')) {
+            userRole = UserRole.SUPPORT;
+          }
+
+          // Get basic permissions based on role
+          const permissions = getPermissionsForRole(userRole);
 
           const user: User = {
             id: currentUser.userId,
-            email: userInfo.email,
-            firstName: userInfo.given_name || '',
-            lastName: userInfo.family_name || '',
-            role: userInfo['custom:role'] as UserRole || UserRole.DISPATCHER,
-            tenantId: userInfo['custom:tenant_id'] || '',
-            permissions: parsePermissions(userInfo['custom:permissions'] || ''),
+            email: userInfo.email || '',
+            firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || '',
+            lastName: userInfo.family_name || userInfo.name?.split(' ').slice(1).join(' ') || '',
+            role: userRole,
+            tenantId: 'default-tenant', // Use default tenant for now
+            permissions,
             isActive: true,
             avatar: userInfo.picture
           };
 
-          // Find current tenant or use first available
-          const currentTenant = tenants.find(t => t.id === user.tenantId) || tenants[0] || null;
+          // Create a mock tenant for now - will be replaced with real multi-tenant support later
+          const mockTenant: Tenant = {
+            id: 'default-tenant',
+            name: 'Default Tenant',
+            subdomain: 'default',
+            primaryColor: '#3B82F6',
+            timezone: 'America/New_York',
+            address: {
+              street: '123 Main St',
+              city: 'New York',
+              state: 'NY',
+              zipCode: '10001',
+              country: 'US'
+            },
+            settings: {
+              maxDrivers: 100,
+              operatingHours: {
+                monday: { isActive: true, openTime: '06:00', closeTime: '22:00' },
+                tuesday: { isActive: true, openTime: '06:00', closeTime: '22:00' },
+                wednesday: { isActive: true, openTime: '06:00', closeTime: '22:00' },
+                thursday: { isActive: true, openTime: '06:00', closeTime: '22:00' },
+                friday: { isActive: true, openTime: '06:00', closeTime: '22:00' },
+                saturday: { isActive: true, openTime: '08:00', closeTime: '20:00' },
+                sunday: { isActive: true, openTime: '08:00', closeTime: '20:00' }
+              },
+              serviceTypes: [ServiceType.STANDARD, ServiceType.PREMIUM],
+              autoDispatch: true,
+              requireSignature: false,
+              enableTips: true,
+              currency: 'USD',
+              distanceUnit: 'miles'
+            },
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
 
           setAuthState({
             user,
-            currentTenant,
-            availableTenants: tenants,
+            currentTenant: mockTenant,
+            availableTenants: [mockTenant],
             isLoading: false,
             isAuthenticated: true,
             accessToken,
@@ -177,10 +234,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         throw new Error('Tenant not found');
       }
 
-      // Update user's current tenant in the backend
-      if (authState.accessToken) {
-        await updateUserTenant(authState.accessToken, tenantId);
-      }
+      // For now, just update local state since multi-tenant switching isn't implemented yet
+      // Update user's current tenant in the backend when API is ready
+      // if (authState.accessToken) {
+      //   await updateUserTenant(authState.accessToken, tenantId);
+      // }
 
       // Update local state
       setAuthState(prev => ({
@@ -263,21 +321,58 @@ function parsePermissions(permissionsString: string): Permission[] {
   }
 }
 
+// Get default permissions based on user role
+function getPermissionsForRole(role: UserRole): Permission[] {
+  switch (role) {
+    case UserRole.ADMIN:
+      return [
+        Permission.VIEW_TRIPS,
+        Permission.CREATE_TRIPS,
+        Permission.EDIT_TRIPS,
+        Permission.CANCEL_TRIPS,
+        Permission.VIEW_DRIVERS,
+        Permission.MANAGE_DRIVERS,
+        Permission.VIEW_ANALYTICS,
+        Permission.EXPORT_DATA,
+        Permission.MANAGE_TENANTS,
+        Permission.VIEW_AUDIT_LOGS
+      ];
+    case UserRole.MANAGER:
+      return [
+        Permission.VIEW_TRIPS,
+        Permission.CREATE_TRIPS,
+        Permission.EDIT_TRIPS,
+        Permission.CANCEL_TRIPS,
+        Permission.VIEW_DRIVERS,
+        Permission.MANAGE_DRIVERS,
+        Permission.VIEW_ANALYTICS,
+        Permission.EXPORT_DATA
+      ];
+    case UserRole.SUPPORT:
+      return [
+        Permission.VIEW_TRIPS,
+        Permission.EDIT_TRIPS,
+        Permission.VIEW_DRIVERS,
+        Permission.VIEW_ANALYTICS
+      ];
+    case UserRole.DISPATCHER:
+    default:
+      return [
+        Permission.VIEW_TRIPS,
+        Permission.CREATE_TRIPS,
+        Permission.EDIT_TRIPS,
+        Permission.CANCEL_TRIPS,
+        Permission.VIEW_DRIVERS
+      ];
+  }
+}
+
 async function fetchUserTenants(accessToken: string): Promise<Tenant[]> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL}/user/tenants`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch user tenants');
-    }
-
-    const data = await response.json();
-    return data.tenants || [];
+    // For now, return empty array since multi-tenant API isn't implemented yet
+    // This will be replaced with actual API call once backend is ready
+    console.log('fetchUserTenants called with token:', accessToken ? 'present' : 'missing');
+    return [];
   } catch (error) {
     console.error('Failed to fetch user tenants:', error);
     return [];
@@ -286,18 +381,12 @@ async function fetchUserTenants(accessToken: string): Promise<Tenant[]> {
 
 async function updateUserTenant(accessToken: string, tenantId: string): Promise<void> {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_API_GATEWAY_URL}/user/tenant`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ tenantId })
-    });
+    // For now, this is a no-op since multi-tenant API isn't implemented yet
+    // This will be replaced with actual API call once backend is ready
+    console.log('updateUserTenant called with:', { tenantId, hasToken: !!accessToken });
 
-    if (!response.ok) {
-      throw new Error('Failed to update user tenant');
-    }
+    // Simulate success for now
+    return Promise.resolve();
   } catch (error) {
     console.error('Failed to update user tenant:', error);
     throw error;
