@@ -15,7 +15,7 @@ export default function LoginPage() {
     // Redirect if already authenticated and has selected tenant
     if (isAuthenticated && currentTenant) {
       setStep('redirecting');
-      window.location.href = '/dashboard';
+      window.location.href = '/';
       return;
     }
 
@@ -84,7 +84,7 @@ export default function LoginPage() {
                 setStep('tenant-selection');
               } else {
                 setStep('redirecting');
-                window.location.href = '/dashboard';
+                window.location.href = '/';
               }
             }}
           />
@@ -94,7 +94,7 @@ export default function LoginPage() {
           <TenantSelector
             onTenantSelected={() => {
               setStep('redirecting');
-              window.location.href = '/dashboard';
+              window.location.href = '/';
             }}
           />
         )}
