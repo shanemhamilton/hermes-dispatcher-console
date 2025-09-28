@@ -75,8 +75,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setAuthState(prev => ({ ...prev, isLoading: true }));
 
-      const currentUser = await getCurrentUser();
-      const session = await fetchAuthSession();
+      // Try to get current user - this will throw if not authenticated
+      let currentUser;
+      let session;
+
+      try {
+        currentUser = await getCurrentUser();
+        session = await fetchAuthSession();
+      } catch (error) {
+        // User is not authenticated - this is expected behavior
+        console.log('No authenticated user found');
+        setAuthState({
+          user: null,
+          currentTenant: null,
+          availableTenants: [],
+          isLoading: false,
+          isAuthenticated: false,
+          accessToken: null,
+          refreshToken: null
+        });
+        return;
+      }
 
       if (currentUser && session.tokens) {
         const accessToken = session.tokens.accessToken?.toString();
@@ -400,20 +419,25 @@ export function withAuth<P extends object>(Component: React.ComponentType<P>) {
 
     if (isLoading) {
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       );
     }
 
     if (!isAuthenticated) {
+      // Dynamically import and render the login form
+      const LoginForm = React.lazy(() => import('@/components/auth/login-form'));
       return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
-            <p className="text-gray-600">Please sign in to continue.</p>
+        <React.Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        </div>
+        }>
+          <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 lg:px-8">
+            <LoginForm />
+          </div>
+        </React.Suspense>
       );
     }
 
